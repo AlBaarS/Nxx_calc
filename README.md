@@ -6,8 +6,9 @@ Nxx_calc is a python 3 based tool to calculate the Nxx, Lxx and GC content of yo
 
 ### Usage
 The script is used as follows: 'python3 Nxx_calc --xx <xx> --input <input directory>'
-Use '--xx' you can specify your desired xx (--xx 50 will give N50/L50).
-Use '--input' to specify an input **directory.** Hard and soft directory doesn't matter, but you cannot specify a file. The script will only use fasta files!
+Use '--xx' or '-x' you can specify your desired xx (--xx 50 will give N50/L50).
+Use '--input' or '-i' to specify an input directory or path to a file.
+As of now, the '--output' or '-o' function does nothing, but it will be added somewhere in the future, if I feel like it.
 The flags '--help' and '--version' will give you the list of possible flags and the version, respectively.
   
 ### Disclaimer
