@@ -15,7 +15,7 @@ Nxx.add_argument('--input', '-i',
 		required=True)
 Nxx.add_argument('--version', '-v',
 		action='version',
-		version='Nxx_calc 1.2')
+		version='Nxx_calc 1.3')
 Nxx.add_argument('--output', "-o",
                  action ='store',
                  help ='Specify the output directory',
@@ -30,10 +30,27 @@ input = str(namespace.input)
 outdir = str(namespace.output)
 gc = bool(namespace.GC)
 if os.path.isfile(input):
-	fname = input.split('/')
-	print('Input file: ' + str(fname[-1]))
-else:
+	if input.endswith('.gz'):
+		fname = input.split('/')
+		print('Input file: ' + str(fname[-1]))
+		print('Gunzipping file')
+		os.system('gunzip ' + input)
+		input = input.strip('.gz')
+		fname2 = input.split('/')
+		print('Gunzipping of ' + str(fname2[-1]) + ' complete')
+	else:
+		fname = input.split('/')
+		print('Input file: ' + str(fname[-1]))
+elif os.path.isdir(input):
+	for files in os.walk(input):
+		for file in files:
+			file = str(file).strip('[]')
+			if file.endswith('.gz'):
+				print('Gunzipping files')
+				os.system('gunzip ' + str(input) + str(file))
 	print('Input folder: ' + str(os.path.realpath(input)))
+else:
+	print('Error: User provided a file/nonexistent directory. Please specify an (existing) directory')
 if os.path.isdir(outdir):
 	print('Output folder: ' + str(os.path.realpath(outdir)))
 else:
@@ -49,7 +66,7 @@ def count_contig(file):
 		doc = open(str(file), 'r')
 		isfile = False
 	else:
-		print('Error: Specified path is no file or directory')
+		print('Error: Specified path is no file or directory or does not exist')
 	fasta = list(doc.readlines())
 	#selecting the contigs
 	con = list(filter(lambda x: not '>' in x, fasta))
@@ -157,9 +174,15 @@ if os.path.isdir(input):
 	files = sorted(os.listdir(input))
 	new_files = [] # with the full path attached
 	for file in files:
-		if re.search(".+\.fasta", file) or re.search(".+\.fa", file):
+		if file.endswith('.fasta') or file.endswith('.fa'):
 			file = os.path.join(input, file)
 			new_files.append(file)
+		elif file.endswith('.gz'):
+			file = os.path.join(input, file)
+			print('Gunzipping ' + file)
+			os.system('gunzip ' + file)
+			nfile = file.strip('.gz')
+			new_files.append(nfile)
     # writing stuff if correct
 	if new_files:
 		with open(str(outdir) + '/' + 'contig_report.txt','w') as f:
@@ -182,7 +205,7 @@ else:
 		with open(str(outdir) + '/' + 'contig_report.txt','w') as f:
 			f.write('Filename\tN' + str(xx) + '\tL' + str(xx) + '\t' + 'GC content' + '\n')
 			fname = str(input).split('/')
-			print("Processing" + str(fname[-1]))
+			print("Processing " + str(fname[-1]))
 			count_contig(input)
 			Nxx_calc(input, xx)
 	else:
