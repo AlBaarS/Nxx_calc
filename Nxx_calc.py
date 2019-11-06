@@ -2,7 +2,7 @@ import os, re, argparse, sys
 
 #input for the desired Nxx/Lxx
 Nxx = argparse.ArgumentParser(prog='Contig_Analysis_Nxx', usage='python3 Nxx_calc.py --xx [xx] --input [input file/dir] '
-				'--output [output dir] --GC [True/False]',
+				'--output [output dir] --GC --array',
                               description='Contig Nxx/Lxx and GC-content calculator. Simply fill in your desired xx '
                                           'for your test (so xx = 50 for N50) and let the script take care of the rest')
 Nxx.add_argument('--xx', '-x',
@@ -15,20 +15,28 @@ Nxx.add_argument('--input', '-i',
 		required=True)
 Nxx.add_argument('--version', '-v',
 		action='version',
-		version='Nxx_calc 1.3')
+		version='Nxx_calc 1.4')
 Nxx.add_argument('--output', "-o",
                  action ='store',
                  help ='Specify the output directory',
                  required=True)
 Nxx.add_argument('--GC', '-gc',
-		action='store',
-		help='Calculate the GC value or not. Default = False',
-		default=False)
+		action='store_true',
+		help='If called, the GC value will also be calculated',
+		default= False)
+Nxx.add_argument('--array', '-a',
+		action='store_true',
+		help='Make a Nxx array. Returns tab-delimited tables in the report. Can be combined with -gc. Can NOT be combined with -xx.',
+		default= False)
 namespace = Nxx.parse_args()
-xx = int(namespace.xx)
 input = str(namespace.input)
 outdir = str(namespace.output)
 gc = bool(namespace.GC)
+array = bool(namespace.array)
+if array:
+	xx = list(range(10,100,10))
+else:
+	xx = int(str(namespace.xx))
 if os.path.isfile(input):
 	if input.endswith('.gz'):
 		fname = input.split('/')
@@ -56,7 +64,10 @@ if os.path.isdir(outdir):
 else:
 	print('Error: User provided a file/nonexistent directory. Please specify an (existing) directory')
 	sys.exit()
-print('Chosen Nxx: N' + str(xx))
+if array:
+	print('Operating in array mode')
+else:
+	print('Chosen Nxx: N' + str(xx))
 
 def count_contig(file):
 	if os.path.isfile(input):
@@ -80,6 +91,7 @@ def count_contig(file):
 		print('You have ' + str(contigs) + ' contigs in ' + str(fname[-1]))
 
 def Nxx_calc(file,xx):
+	f.write('>File: ' + str(file) + '\n>Nxx\tValue\tLxx\tValue\n')
 	if os.path.isfile(input):
 		doc = open(str(input), 'r')
 		isfile = True
@@ -134,12 +146,70 @@ def Nxx_calc(file,xx):
 	Lxx = int(step3[1])
 	Nxx = len(str(seq[Lxx]))
 	print('The N' + str(xx) + ' is ' + str(Nxx) + ' and the L' + str(xx) + ' is ' + str(Lxx))
-	if isfile == True:
+	f.write('N' + str(xx) + ':\t' + str(Nxx) + '\tL' + str(xx) + ':\t' + str(Lxx) + '\n')
+	if gc:
+		f.write('>GC-content: ' + str(GC) + '\n')
+
+def Nxx_array(file,xx):
+	f.write('>File: ' + str(file) + '\n>Nxx\tValue\tLxx\tValue\n')
+	if os.path.isfile(input):
+		doc = open(str(input), 'r')
+		isfile = True
+	elif os.path.isdir(input):
+		doc = open(str(file), 'r')
+		isfile = False
+	else:
+		print('Error: Specified path is no file or directory')
+	fasta = list(doc.readlines())
+	#filtering out the contig annotations
+	seq = list(filter(lambda x: not '>' in x, fasta))
+	#determining the total nucleotides
+	seq.sort(key=len, reverse=True)
+	seq_len = int()
+	for s in seq:
+		seq_len += len(str(s).strip('[]'))
+	if isfile:
 		fname = input.split('/')
-		f.write(str(fname[-1]) + '\t' + str(Nxx) + '\t' + str(Lxx) + '\t' + str(GC) + '\n')
+		print(str(fname[-1]) + ' has a total of ' + str(seq_len) + ' nucleotides')
 	else:
 		fname = file.split('/')
-		f.write(str(fname[-1]) + '\t' + str(Nxx) + '\t' + str(Lxx) + '\t' + str(GC) + '\n')
+		print(str(fname[-1]) + ' has a total of ' + str(seq_len) + ' nucleotides')
+	print('The longest contig is ' + str(len(seq[0])) + ' bp and the shortest is ' + str(len(seq[-1])) + ' bp')
+	#calculating the GC content
+	if gc:
+		seq_str = str(seq).strip('[]')
+		G = seq_str.count('G')
+		C = seq_str.count('C')
+		total_len = len(seq_str)
+		GC = round((G+C)/total_len*100,2)
+		if isfile == True:
+			fname = input.split('/')
+			print('The GC content of ' + str(fname[-1]) + ' is ' + str(GC) + '%')
+		else:
+			fname = file.split('/')
+			print('The GC content of ' + str(fname[-1]) + ' is ' + str(GC) + '%')
+	else:
+		GC = 'X'
+	#calculating the Nxx
+	print('Calculating the Nxx array:')
+	for x in xx:
+		threshold = int(seq_len)*(x/100)
+		contigs = int()
+		var1 = int()
+		#here the actual calculations are called and the output is stored in a list
+		step1 = list(plus_100(contigs,seq,threshold,var1))
+		contigs1 = step1[0]
+		var1_1 = step1[1]
+		step2 = list(min_10(contigs1,seq,threshold,var1_1))
+		contigs2 = step2[0]
+		var1_2 = step2[1]
+		step3 = list(plus_1(contigs2,seq,threshold,var1_2))
+		Lxx = int(step3[1])
+		Nxx = len(str(seq[Lxx]))
+		print('The N' + str(x) + ' is ' + str(Nxx) + ' and the L' + str(x) + ' is ' + str(Lxx))
+		f.write('N' + str(x) + ':\t' + str(Nxx) + '\tL' + str(x) + ':\t' + str(Lxx) + '\n')
+	if gc:
+		f.write('>GC-content: ' + str(GC) + '\n')
 
 def plus_100(contigs,seq,threshold,var1):
 	var0 = 0
@@ -168,6 +238,7 @@ def plus_1(contigs,seq,threshold,var1):
 			return contigs,var1
 
 #finding your files and calling the calculating functions
+f = open(str(outdir) + '/' + 'contig_report.txt','w')
 print('Creating report file')
 if os.path.isdir(input):
     # making lists out of the input files
@@ -183,30 +254,32 @@ if os.path.isdir(input):
 			os.system('gunzip ' + file)
 			nfile = file.strip('.gz')
 			new_files.append(nfile)
-    # writing stuff if correct
+    # writing stuff if files are present
 	if new_files:
-		with open(str(outdir) + '/' + 'contig_report.txt','w') as f:
-			f.write('Filename\tN' + str(xx) + '\tL' + str(xx) + '\t' + 'GC content' + '\n')
-			for file in new_files:
-				fname = str(file).split('/')
-				print('File detected: ' + str(fname[-1]))
-			for file in new_files:
-				fname = str(file).split('/')
-				print('Processing ' + str(fname[-1]))
-				count_contig(file)
+		for file in new_files:
+			fname = str(file).split('/')
+			print('File detected: ' + str(fname[-1]))
+		for file in new_files:
+			fname = str(file).split('/')
+			print('Processing ' + str(fname[-1]))
+			count_contig(file)
+			if array:
+				Nxx_array(file,xx)
+			else:
 				Nxx_calc(file, xx)
-	else: # exit when not correct
+	else: # exit when no files are detected
 		print("No fasta files detected, please make sure your input files are in fasta format")
 		sys.exit()
 
-# or is the input a file?
+# or is the input a singular file?
 else:
 	if re.search(".+\.fasta", input) or re.search(".+\.fa", input):
-		with open(str(outdir) + '/' + 'contig_report.txt','w') as f:
-			f.write('Filename\tN' + str(xx) + '\tL' + str(xx) + '\t' + 'GC content' + '\n')
-			fname = str(input).split('/')
-			print("Processing " + str(fname[-1]))
-			count_contig(input)
+		fname = str(input).split('/')
+		print("Processing " + str(fname[-1]))
+		count_contig(input)
+		if array:
+			Nxx_array(input, xx)
+		else:
 			Nxx_calc(input, xx)
 	else:
 		print("Please make sure your input file is in fasta format")
