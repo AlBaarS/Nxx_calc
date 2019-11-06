@@ -13,7 +13,10 @@ Use '--output' or '-o' [path] to specify the output directory, where your report
 
 #### Optional args:
 Use '--xx' or '-x' [int] you can specify your desired xx (--xx 50 will give N50/L50).
-Use '--GC' or '-gc' [True/False] to specify whether you want the GC content to be calculated. Since this is now the slowest feature, I decided to make it toggleable.
+Use '--GC' or '-gc' to specify whether you want the GC content to be calculated. Since this is now the slowest feature, I decided to make it toggleable.
+Use '--array' or '-a' to run in array mode. This will create an array per file with the N10-N90, L10-L90.
+ * Can be combined with the -gc flag.
+ * Can NOT be combined with -x. Or do. I have no idea what will happen. Maybe a glitch will occur on the matrix. Who knows. I don't recommend it. But we live in a free world, so do what you desire. Just don't blame me if the FBI is at your doorstep. Thanks in advance.
 
 The flags '--help' and '--version' will give you the list of possible flags and the version, respectively.
   
@@ -22,5 +25,5 @@ This tool is a highly experimental python script made by a biology/bioinformatic
 
 ### To-do list (things that MAY appear in future versions)
 - Support for multiple files without the need for a folder
-- Nxx-array: create a tab-delimited array of Nxx per file (N10-N20-N30-etc.)
 - Graphs depicting length distribution and Nxx array
+- Windows interface 
