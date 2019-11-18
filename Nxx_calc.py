@@ -1,8 +1,10 @@
 import os, re, argparse, sys
+import matplotlib.pyplot as plt
+import numpy as np
 
-#input for the desired Nxx/Lxx
+# The possible flags for Nxx_calc are stored here
 Nxx = argparse.ArgumentParser(prog='Contig_Analysis_Nxx', usage='python3 Nxx_calc.py --xx [xx] --input [input file/dir] '
-				'--output [output dir] --GC --array',
+				'--output [output dir] --GC --array --length_distribution',
                               description='Contig Nxx/Lxx and GC-content calculator. Simply fill in your desired xx '
                                           'for your test (so xx = 50 for N50) and let the script take care of the rest')
 Nxx.add_argument('--xx', '-x',
@@ -12,31 +14,49 @@ Nxx.add_argument('--xx', '-x',
 Nxx.add_argument('--input', '-i',
 		action='store',
 		help='Specify the input file or directory. Only accepts .fasta or .fa files.',
-		required=True)
+		required= True)
 Nxx.add_argument('--version', '-v',
 		action='version',
-		version='Nxx_calc 1.4')
+		version='Nxx_calc 1.5')
 Nxx.add_argument('--output', "-o",
                  action ='store',
                  help ='Specify the output directory',
-                 required=True)
+                 required= True)
 Nxx.add_argument('--GC', '-gc',
 		action='store_true',
 		help='If called, the GC value will also be calculated',
 		default= False)
 Nxx.add_argument('--array', '-a',
 		action='store_true',
-		help='Make a Nxx array. Returns tab-delimited tables in the report. Can be combined with -gc. Can NOT be combined with -xx.',
+		help='Make a Nxx array. Returns tab-delimited tables in the report. Can be combined with --GC. Can NOT be combined with --xx.',
 		default= False)
+Nxx.add_argument('--length_distribution', '-ld',
+		action='store_true',
+		help='Create a length distribution plot',
+		default= False)
+Nxx.add_argument('--array_plot', '-ap',
+		action='store_true',
+		help='Create a plot from the calculated Nxx array. Requires --array.',
+		default= False)
+
+# Here is where the input from the user is processed
 namespace = Nxx.parse_args()
 input = str(namespace.input)
 outdir = str(namespace.output)
 gc = bool(namespace.GC)
 array = bool(namespace.array)
-if array:
+plot = bool(namespace.length_distribution)
+aplot = bool(namespace.array_plot)
+if array or plot:
 	xx = list(range(10,100,10))
 else:
 	xx = int(str(namespace.xx))
+if aplot:
+	if not array:
+		print('Error: The use of --array_plot requires --array')
+		sys.exit()
+
+# Here, it is determined whether your input is a file or directory, and gunzipped if your file was gzipped
 if os.path.isfile(input):
 	if input.endswith('.gz'):
 		fname = input.split('/')
@@ -68,7 +88,11 @@ if array:
 	print('Operating in array mode')
 else:
 	print('Chosen Nxx: N' + str(xx))
+if plot:
+	print('Length distribution plot enabled')
 
+# Here the functions are defined, and some random values are stored at the top
+fig_no = 1
 def count_contig(file):
 	if os.path.isfile(input):
 		doc = open(str(input), 'r')
@@ -149,8 +173,9 @@ def Nxx_calc(file,xx):
 	f.write('N' + str(xx) + ':\t' + str(Nxx) + '\tL' + str(xx) + ':\t' + str(Lxx) + '\n')
 	if gc:
 		f.write('>GC-content: ' + str(GC) + '\n')
+	return seq
 
-def Nxx_array(file,xx):
+def Nxx_array(file,xx,fig_no):
 	f.write('>File: ' + str(file) + '\n>Nxx\tValue\tLxx\tValue\n')
 	if os.path.isfile(input):
 		doc = open(str(input), 'r')
@@ -192,6 +217,7 @@ def Nxx_array(file,xx):
 		GC = 'X'
 	#calculating the Nxx
 	print('Calculating the Nxx array:')
+	xx_list = []
 	for x in xx:
 		threshold = int(seq_len)*(x/100)
 		contigs = int()
@@ -206,10 +232,24 @@ def Nxx_array(file,xx):
 		step3 = list(plus_1(contigs2,seq,threshold,var1_2))
 		Lxx = int(step3[1])
 		Nxx = len(str(seq[Lxx]))
+		xx_list.append(Nxx)
 		print('The N' + str(x) + ' is ' + str(Nxx) + ' and the L' + str(x) + ' is ' + str(Lxx))
 		f.write('N' + str(x) + ':\t' + str(Nxx) + '\tL' + str(x) + ':\t' + str(Lxx) + '\n')
 	if gc:
 		f.write('>GC-content: ' + str(GC) + '\n')
+	n_list = [10,20,30,40,50,60,70,80,90]
+	if aplot:
+		print('Creating Nxx array plot')
+		fname = file.split('/')
+		plt.figure(fig_no)
+		fig_no += 1
+		plt.bar(n_list, xx_list, label=str(fname[-1]), width=3, color='orange')
+		plt.xlabel('Nxx')
+		plt.ylabel('Size')
+		plt.title('Nxx array plot')
+		plt.legend()
+		plt.savefig(outdir + str(fname[-1] + '_Nxx_array.png'))
+	return seq, fig_no
 
 def plus_100(contigs,seq,threshold,var1):
 	var0 = 0
@@ -237,11 +277,11 @@ def plus_1(contigs,seq,threshold,var1):
 		if contigs > threshold:
 			return contigs,var1
 
-#finding your files and calling the calculating functions
+# Finding your files and calling the calculating functions
 f = open(str(outdir) + '/' + 'contig_report.txt','w')
 print('Creating report file')
 if os.path.isdir(input):
-    # making lists out of the input files
+    # Making lists out of the input files
 	files = sorted(os.listdir(input))
 	new_files = [] # with the full path attached
 	for file in files:
@@ -264,9 +304,25 @@ if os.path.isdir(input):
 			print('Processing ' + str(fname[-1]))
 			count_contig(file)
 			if array:
-				Nxx_array(file,xx)
+				out = Nxx_array(file, xx, fig_no)
 			else:
-				Nxx_calc(file, xx)
+				out = Nxx_calc(file, xx)
+			if plot:
+				print('Creating your plots')
+				seq_data = []
+				fig_no = out[1]
+				for element in out[0]:
+					seq_data.append(len(element))
+				x = list(range(0,len(seq_data)))
+				y = np.asarray(seq_data)
+				plt.figure(fig_no)
+				fig_no += 1
+				plt.plot(x, y, label=str(fname[-1]))
+				plt.xlabel('contig')
+				plt.ylabel('contig length')
+				plt.title('Length distribution')
+				plt.legend()
+				plt.savefig(outdir + fname[-1] + '_ld.png')
 	else: # exit when no files are detected
 		print("No fasta files detected, please make sure your input files are in fasta format")
 		sys.exit()
@@ -278,9 +334,24 @@ else:
 		print("Processing " + str(fname[-1]))
 		count_contig(input)
 		if array:
-			Nxx_array(input, xx)
+			seq = Nxx_array(input, xx)
 		else:
-			Nxx_calc(input, xx)
+			seq = Nxx_calc(input, xx)
+		if plot:
+			print('Creating your plot')
+			seq_data = []
+			for element in seq:
+				seq_data.append(len(element))
+			x = list(range(0,len(seq_data)))
+			y = np.asarray(seq_data)
+			plt.figure(fig_no)
+			fig_no += 1
+			plt.plot(x, y, label=str(fname[-1]))
+			plt.xlabel('contig')
+			plt.ylabel('contig length')
+			plt.title('Length distribution')
+			plt.legend()
+			plt.savefig(outdir + fname[-1] + '_ld.png')
 	else:
 		print("Please make sure your input file is in fasta format")
 		sys.exit()
